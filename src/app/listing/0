@@ -1,0 +1,560 @@
+// src/app/listing/[id]/page.tsx
+"use client"
+
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Separator } from '@/components/ui/separator'
+import { ShoppingCart, Star, User, Package, Shield, MessageCircle } from 'lucide-react'
+import Image from 'next/image'
+import Link from 'next/link'
+import { useCart } from '@/hooks/use-cart'
+import { useAuth } from '@/hooks/use-auth'
+import toast from 'react-hot-toast'
+
+interface Listing {
+  id: string
+  title: string
+  description: string
+  cardName: string
+  setName?: string
+  rarity?: string
+  cardNumber?: string
+  price: number
+  quantity: number
+  condition: string
+  images: string[]
+  createdAt: string
+  seller: {
+    id: string
+    name: string
+    image?: string
+  }
+  category: {
+    name: string
+    slug: string
+  }
+  reviews: Review[]
+  _count: {
+    reviews: number
+  }
+}
+
+interface Review {
+  id: string
+  rating: number
+  comment?: string
+  createdAt: string
+  user: {
+    name: string
+    image?: string
+  }
+}
+
+const conditionDescriptions = {
+  'MINT': 'Perfect condition, no wear visible',
+  'NEAR_MINT': 'Minimal wear, excellent condition',
+  'LIGHTLY_PLAYED': 'Light wear, very good condition',
+  'MODERATELY_PLAYED': 'Moderate wear, good condition',
+  'HEAVILY_PLAYED': 'Heavy wear, fair condition',
+  'DAMAGED': 'Significant damage, poor condition',
+}
+
+export default function ListingDetailPage() {
+  const params = useParams()
+  const [listing, setListing] = useState<Listing | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [selectedImage, setSelectedImage] = useState(0)
+  const [quantity, setQuantity] = useState(1)
+  const [newReview, setNewReview] = useState({ rating: 5, comment: '' })
+  const [submittingReview, setSubmittingReview] = useState(false)
+  
+  const { addItem } = useCart()
+  const { user, isAuthenticated } = useAuth()
+
+  useEffect(() => {
+    if (params.id) {
+      fetchListing(params.id as string)
+    }
+  }, [params.id])
+
+  const fetchListing = async (id: string) => {
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/listings/${id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setListing(data)
+      } else {
+        toast.error('Listing not found')
+      }
+    } catch (error) {
+      console.error('Failed to fetch listing:', error)
+      toast.error('Failed to load listing')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAddToCart = async () => {
+    if (!listing) return
+    await addItem(listing.id, quantity)
+  }
+
+  const handleSubmitReview = async () => {
+    if (!listing || !isAuthenticated) return
+
+    setSubmittingReview(true)
+    try {
+      const response = await fetch(`/api/listings/${listing.id}/reviews`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newReview),
+      })
+
+      if (response.ok) {
+        toast.success('Review submitted!')
+        setNewReview({ rating: 5, comment: '' })
+        fetchListing(listing.id) // Refresh to show new review
+      } else {
+        const error = await response.json()
+        toast.error(error.message || 'Failed to submit review')
+      }
+    } catch (error) {
+      console.error('Failed to submit review:', error)
+      toast.error('Failed to submit review')
+    } finally {
+      setSubmittingReview(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="animate-pulse grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="aspect-square bg-gray-200 rounded-lg"></div>
+          <div className="space-y-4">
+            <div className="h-8 bg-gray-200 rounded"></div>
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!listing) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Listing Not Found</h1>
+          <Button asChild>
+            <Link href="/">Back to Home</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  const averageRating = listing.reviews.length > 0 
+    ? listing.reviews.reduce((sum, review) => sum + review.rating, 0) / listing.reviews.length 
+    : 0
+
+  const canReview = isAuthenticated && user?.id !== listing.seller.id
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      {/* Breadcrumb */}
+      <nav className="mb-6">
+        <div className="flex items-center space-x-2 text-sm text-gray-600">
+          <Link href="/" className="hover:text-primary">Home</Link>
+          <span>/</span>
+          <Link href={`/category/${listing.category.slug}`} className="hover:text-primary">
+            {listing.category.name}
+          </Link>
+          <span>/</span>
+          <span className="text-gray-400">{listing.cardName}</span>
+        </div>
+      </nav>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Images */}
+        <div className="space-y-4">
+          <div className="aspect-square relative rounded-lg overflow-hidden bg-gray-100">
+            {listing.images && listing.images.length > 0 ? (
+              <Image
+                src={listing.images[selectedImage]}
+                alt={listing.cardName}
+                fill
+                className="object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-gray-400">No Image Available</span>
+              </div>
+            )}
+          </div>
+          
+          {listing.images && listing.images.length > 1 && (
+            <div className="flex space-x-2">
+              {listing.images.map((image, index) => (
+                <button
+                  key={index}
+                  onClick={() => setSelectedImage(index)}
+                  className={`w-20 h-20 rounded-md overflow-hidden border-2 ${
+                    selectedImage === index ? 'border-primary' : 'border-gray-200'
+                  }`}
+                >
+                  <Image
+                    src={image}
+                    alt={`${listing.cardName} ${index + 1}`}
+                    width={80}
+                    height={80}
+                    className="object-cover w-full h-full"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Details */}
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">{listing.title}</h1>
+            <p className="text-xl text-gray-600 mb-4">{listing.cardName}</p>
+            
+            <div className="flex items-center space-x-4 mb-4">
+              <Badge className="text-lg px-3 py-1">
+                {listing.condition.replace('_', ' ')}
+              </Badge>
+              {listing.setName && (
+                <span className="text-gray-600">Set: {listing.setName}</span>
+              )}
+              {listing.rarity && (
+                <span className="text-gray-600">Rarity: {listing.rarity}</span>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2 mb-4">
+              <div className="flex items-center">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`h-5 w-5 ${
+                      star <= averageRating 
+                        ? 'fill-yellow-400 text-yellow-400' 
+                        : 'text-gray-300'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-gray-600">
+                ({listing._count.reviews} {listing._count.reviews === 1 ? 'review' : 'reviews'})
+              </span>
+            </div>
+
+            <p className="text-4xl font-bold text-primary mb-6">
+              ${listing.price.toFixed(2)}
+            </p>
+          </div>
+
+          {/* Seller Info */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                {listing.seller.image ? (
+                  <Image
+                    src={listing.seller.image}
+                    alt={listing.seller.name}
+                    width={40}
+                    height={40}
+                    className="rounded-full"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                    <User className="h-5 w-5 text-gray-400" />
+                  </div>
+                )}
+                <div>
+                  <p className="font-semibold">{listing.seller.name}</p>
+                  <p className="text-sm text-gray-600">Seller</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Purchase */}
+          {listing.seller.id !== user?.id && (
+            <Card>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span>Quantity:</span>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        disabled={quantity <= 1}
+                      >
+                        -
+                      </Button>
+                      <Input
+                        type="number"
+                        min="1"
+                        max={listing.quantity}
+                        value={quantity}
+                        onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                        className="w-20 text-center"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setQuantity(Math.min(listing.quantity, quantity + 1))}
+                        disabled={quantity >= listing.quantity}
+                      >
+                        +
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600">
+                    {listing.quantity} available • Free shipping
+                  </p>
+                  
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={handleAddToCart}
+                    disabled={!isAuthenticated || quantity > listing.quantity}
+                  >
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Add to Cart
+                  </Button>
+                  
+                  {!isAuthenticated && (
+                    <p className="text-sm text-gray-600 text-center">
+                      <Link href="/auth/signin" className="text-primary hover:underline">
+                        Sign in
+                      </Link>{' '}
+                      to purchase
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* Description */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle>Description</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="whitespace-pre-wrap">{listing.description}</p>
+          
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center space-x-2">
+              <Package className="h-5 w-5 text-gray-400" />
+              <div>
+                <p className="font-semibold">Condition</p>
+                <p className="text-sm text-gray-600">
+                  {conditionDescriptions[listing.condition as keyof typeof conditionDescriptions]}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Shield className="h-5 w-5 text-gray-400" />
+              <div>
+                <p className="font-semibold">Authenticity</p>
+                <p className="text-sm text-gray-600">Seller verified</p>
+              </div>
+            </div>
+            
+            {listing.cardNumber && (
+              <div className="flex items-center space-x-2">
+                <span className="h-5 w-5 text-gray-400">#</span>
+                <div>
+                  <p className="font-semibold">Card Number</p>
+                  <p className="text-sm text-gray-600">{listing.cardNumber}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Reviews */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <MessageCircle className="h-5 w-5 mr-2" />
+            Reviews ({listing._count.reviews})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Add Review Form */}
+          {canReview && (
+            <div className="border rounded-lg p-4">
+              <h3 className="font-semibold mb-4">Write a Review</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Rating</label>
+                  <div className="flex space-x-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        onClick={() => setNewReview({ ...newReview, rating: star })}
+                        className="p-1"
+                      >
+                        <Star
+                          className={`h-6 w-6 ${
+                            star <= newReview.rating
+                              ? 'fill-yellow-400 text-yellow-400'
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Comment (Optional)</label>
+                  <Textarea
+                    placeholder="Share your experience with this card..."
+                    value={newReview.comment}
+                    onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                  />
+                </div>
+                
+                <Button
+                  onClick={handleSubmitReview}
+                  disabled={submittingReview}
+                >
+                  {submittingReview ? 'Submitting...' : 'Submit Review'}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Reviews List */}
+          {listing.reviews.length > 0 ? (
+            <div className="space-y-4">
+              {listing.reviews.map((review) => (
+                <div key={review.id} className="border rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    {review.user.image ? (
+                      <Image
+                        src={review.user.image}
+                        alt={review.user.name}
+                        width={40}
+                        height={40}
+                        className="rounded-full"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                        <User className="h-5 w-5 text-gray-400" />
+                      </div>
+                    )}
+                    
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span className="font-semibold">{review.user.name}</span>
+                        <div className="flex">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star
+                              key={star}
+                              className={`h-4 w-4 ${
+                                star <= review.rating
+                                  ? 'fill-yellow-400 text-yellow-400'
+                                  : 'text-gray-300'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {new Date(review.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      {review.comment && (
+                        <p className="text-gray-700">{review.comment}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-600">No reviews yet. Be the first to review this card!</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// src/components/ui/textarea.tsx
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+export interface TextareaProps
+  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ className, ...props }, ref) => {
+    return (
+      <textarea
+        className={cn(
+          "flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Textarea.displayName = "Textarea"
+
+export { Textarea }
+
+// src/components/ui/separator.tsx
+import * as React from "react"
+import * as SeparatorPrimitive from "@radix-ui/react-separator"
+import { cn } from "@/lib/utils"
+
+const Separator = React.forwardRef<
+  React.ElementRef<typeof SeparatorPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root>
+>(
+  (
+    { className, orientation = "horizontal", decorative = true, ...props },
+    ref
+  ) => (
+    <SeparatorPrimitive.Root
+      ref={ref}
+      decorative={decorative}
+      orientation={orientation}
+      className={cn(
+        "shrink-0 bg-border",
+        orientation === "horizontal" ? "h-[1px] w-full" : "h-full w-[1px]",
+        className
+      )}
+      {...props}
+    />
+  )
+)
+Separator.displayName = SeparatorPrimitive.Root.displayName
+
+export { Separator }
