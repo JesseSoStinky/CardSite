@@ -107,9 +107,9 @@ model Listing {
   categoryId  String
   category    Category      @relation(fields: [categoryId], references: [id])
   
-  cartItems   CartItem[]
-  purchases   Purchase[]
-  reviews     Review[]
+  cartItems     CartItem[]
+  purchaseItems PurchaseItem[]
+  reviews       Review[]
   
   @@map("listings")
 }

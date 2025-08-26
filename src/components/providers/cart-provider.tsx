@@ -1,61 +1,10 @@
-// src/app/layout.tsx
-import './globals.css'
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { AuthProvider } from '@/components/auth/auth-provider'
-import { CartProvider } from '@/hooks/use-cart'
-import { Toaster } from 'react-hot-toast'
-import { Navbar } from '@/components/layout/navbar'
-import { Footer } from '@/components/layout/footer'
-
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata: Metadata = {
-  title: 'TCG Marketplace - Buy & Sell Trading Cards',
-  description: 'The premier destination for trading card collectors. Buy, sell, and discover rare Pokémon, Magic, and Yu-Gi-Oh! cards.',
-}
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <html lang="en">
-      <body className={inter.className}>
-        <AuthProvider>
-          <CartProvider>
-            <div className="min-h-screen flex flex-col">
-              <Navbar />
-              <main className="flex-1">
-                {children}
-              </main>
-              <Footer />
-            </div>
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: '#363636',
-                  color: '#fff',
-                },
-              }}
-            />
-          </CartProvider>
-        </AuthProvider>
-      </body>
-    </html>
-  )
-}
-
-// src/components/auth/auth-provider.tsx
+// src/components/providers/cart-provider.tsx
 "use client"
 
-import { SessionProvider } from "next-auth/react"
+import { CartProvider as CartContextProvider } from '@/hooks/use-cart'
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  return <SessionProvider>{children}</SessionProvider>
+export function CartProvider({ children }: { children: React.ReactNode }) {
+  return <CartContextProvider>{children}</CartContextProvider>
 }
 
 // src/components/layout/navbar.tsx
@@ -81,7 +30,6 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useCart } from '@/hooks/use-cart'
-import { cn } from '@/lib/utils'
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -173,14 +121,6 @@ export function Navbar() {
                     Hi, {user?.name || 'User'}
                   </span>
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push('/dashboard')}
-                  >
-                    <Settings className="h-4 w-4 mr-1" />
-                    Dashboard
-                  </Button>
-                  <Button
                     variant="outline"
                     size="sm"
                     onClick={() => logout()}
@@ -262,17 +202,6 @@ export function Navbar() {
                     variant="ghost"
                     className="w-full justify-start"
                     onClick={() => {
-                      router.push('/dashboard')
-                      setIsMenuOpen(false)
-                    }}
-                  >
-                    <Settings className="h-4 w-4 mr-2" />
-                    Dashboard
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    onClick={() => {
                       logout()
                       setIsMenuOpen(false)
                     }}
@@ -349,9 +278,6 @@ export function Footer() {
               <Link href="/about" className="block text-gray-400 hover:text-white transition-colors">
                 About Us
               </Link>
-              <Link href="/contact" className="block text-gray-400 hover:text-white transition-colors">
-                Contact
-              </Link>
             </div>
           </div>
 
@@ -368,9 +294,6 @@ export function Footer() {
               <Link href="/privacy" className="block text-gray-400 hover:text-white transition-colors">
                 Privacy Policy
               </Link>
-              <Link href="/shipping" className="block text-gray-400 hover:text-white transition-colors">
-                Shipping Info
-              </Link>
             </div>
           </div>
 
@@ -385,10 +308,6 @@ export function Footer() {
               <div className="flex items-center space-x-2 text-gray-400">
                 <Phone className="h-4 w-4" />
                 <span>1-800-TCG-CARD</span>
-              </div>
-              <div className="flex items-center space-x-2 text-gray-400">
-                <MapPin className="h-4 w-4" />
-                <span>San Francisco, CA</span>
               </div>
             </div>
           </div>
